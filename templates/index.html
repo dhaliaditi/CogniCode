@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CogniCode — Code Quality Predictor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-size: 2.8rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+  }
+
+  .tagline {
+    color: #94a3b8;
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 640px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 28px;
+    background: #0f1117;
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    background: #6366f1;
+    color: white;
+    font-weight: 600;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  label {
+    display: block;
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+  }
+
+  input[type=text], input[type=url] {
+    width: 100%;
+    padding: 12px 16px;
+    background: #0f1117;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #e2e8f0;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type=text]:focus, input[type=url]:focus {
+    border-color: #6366f1;
+  }
+
+  .file-drop {
+    border: 2px dashed #334155;
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    color: #94a3b8;
+    font-size: 0.875rem;
+  }
+
+  .file-drop:hover { border-color: #6366f1; }
+
+  .file-drop input[type=file] {
+    display: none;
+  }
+
+  .submit-btn {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .submit-btn:hover { opacity: 0.9; }
+
+  .error-box {
+    background: #450a0a;
+    border: 1px solid #b91c1c;
+    border-radius: 10px;
+    padding: 14px 18px;
+    color: #fca5a5;
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+  }
+
+  .dimensions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 32px;
+    max-width: 640px;
+    width: 100%;
+  }
+
+  .dim-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .dim-card h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+
+  .dim-card .dim-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+
+  .dim-card .dim-label {
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+
+  .loading {
+    display: none;
+    text-align: center;
+    margin-top: 16px;
+    color: #94a3b8;
+    font-size: 0.875rem;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #334155;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    margin-top: 48px;
+    color: #475569;
+    font-size: 0.78rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">⚙ CogniCode</div>
+  <p class="tagline">Predicting human-perceived Python code quality using static analysis + ML</p>
+  <div class="badge-row">
+    <span class="badge">Complexity</span>
+    <span class="badge">Readability</span>
+    <span class="badge">Maintainability</span>
+    <span class="badge">Refactoring Necessity</span>
+    <span class="badge">Random Forest · κ = 0.52</span>
+  </div>
+</div>
+
+<div class="card">
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+
+  <div class="tab-row">
+    <button class="tab active" onclick="switchTab('github', this)">GitHub URL</button>
+    <button class="tab"        onclick="switchTab('path', this)">Local Path</button>
+    <button class="tab"        onclick="switchTab('upload', this)">Upload .py</button>
+  </div>
+
+  <!-- GitHub URL -->
+  <div class="tab-panel active" id="panel-github">
+    <form method="POST" action="/analyze" onsubmit="showLoading()">
+      <input type="hidden" name="mode" value="github">
+      <label>GitHub repository URL</label>
+      <input type="url" name="repo_url"
+             placeholder="https://github.com/user/repo"
+             value="{{ request.form.get('repo_url', '') }}">
+      <button class="submit-btn" type="submit">Analyze Repository</button>
+    </form>
+  </div>
+
+  <!-- Local Path -->
+  <div class="tab-panel" id="panel-path">
+    <form method="POST" action="/analyze" onsubmit="showLoading()">
+      <input type="hidden" name="mode" value="path">
+      <label>Absolute path to a .py file or project directory</label>
+      <input type="text" name="local_path"
+             placeholder="/home/user/myproject"
+             value="{{ request.form.get('local_path', '') }}">
+      <button class="submit-btn" type="submit">Analyze Path</button>
+    </form>
+  </div>
+
+  <!-- Upload -->
+  <div class="tab-panel" id="panel-upload">
+    <form method="POST" action="/analyze" enctype="multipart/form-data" onsubmit="showLoading()">
+      <input type="hidden" name="mode" value="upload">
+      <label>Upload a single Python file</label>
+      <div class="file-drop" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" name="py_file" accept=".py"
+               onchange="document.getElementById('file-name').textContent = this.files[0]?.name || 'No file chosen'">
+        <div>📂 Click to select a .py file</div>
+        <div id="file-name" style="margin-top:8px; color:#6366f1;"></div>
+      </div>
+      <button class="submit-btn" type="submit">Analyze File</button>
+    </form>
+  </div>
+
+  <!-- Optional tools -->
+  <details style="margin-top: 20px;">
+    <summary style="cursor:pointer; color:#64748b; font-size:0.85rem;">
+      ⚙ Optional: SonarQube &amp; Understand (leave blank to skip)
+    </summary>
+    <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
+      <div>
+        <label>SonarQube host</label>
+        <input type="text" name="sonar_host" form="github-form path-form upload-form"
+               placeholder="http://localhost:9000">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label>SonarQube user</label>
+          <input type="text" name="sonar_user" placeholder="admin">
+        </div>
+        <div>
+          <label>SonarQube password</label>
+          <input type="text" name="sonar_password" placeholder="admin">
+        </div>
+      </div>
+      <div>
+        <label>Understand <code>und</code> binary path</label>
+        <input type="text" name="und_bin"
+               placeholder="/path/to/scitools/bin/linux64/und">
+      </div>
+    </div>
+  </details>
+
+  <div class="loading" id="loading">
+    <span class="spinner"></span> Collecting metrics and predicting quality — this may take 30–60 s for large repos…
+  </div>
+</div>
+
+<div class="dimensions">
+  <div class="dim-card">
+    <h4>Complexity</h4>
+    <div class="dim-value" style="color:#6366f1;">RF κ = 0.52</div>
+    <div class="dim-label" style="color:#94a3b8;">Best-performing dimension</div>
+  </div>
+  <div class="dim-card">
+    <h4>Refactoring</h4>
+    <div class="dim-value" style="color:#06b6d4;">AUC = 0.76</div>
+    <div class="dim-label" style="color:#94a3b8;">Practical screening tool</div>
+  </div>
+  <div class="dim-card">
+    <h4>Readability</h4>
+    <div class="dim-value" style="color:#f59e0b;">SVM κ = 0.32</div>
+    <div class="dim-label" style="color:#94a3b8;">Partial — use as guide only</div>
+  </div>
+  <div class="dim-card">
+    <h4>Maintainability</h4>
+    <div class="dim-value" style="color:#f59e0b;">SVM κ = 0.36</div>
+    <div class="dim-label" style="color:#94a3b8;">Partial — use as guide only</div>
+  </div>
+</div>
+
+<footer>
+  CogniCode · University of Saskatchewan · Based on 401-file expert-annotated Python dataset<br>
+  Scores approximate human expert judgment. Not a replacement for code review.
+</footer>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function showLoading() {
+  document.getElementById('loading').style.display = 'block';
+}
+</script>
+</body>
+</html>

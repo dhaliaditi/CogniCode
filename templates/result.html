@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CogniCode — Results</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 40px 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .back-btn {
+    margin-left: auto;
+    padding: 8px 18px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .source-label {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 24px;
+    word-break: break-all;
+  }
+
+  .source-label span { color: #e2e8f0; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  @media (min-width: 600px) {
+    .summary-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .metric-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 20px 18px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .metric-card.complexity::before  { background: #6366f1; }
+  .metric-card.readability::before { background: #06b6d4; }
+  .metric-card.maintain::before    { background: #8b5cf6; }
+  .metric-card.refactor::before    { background: #f59e0b; }
+
+  .metric-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+
+  .metric-score {
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-size: 0.78rem;
+    margin-top: 6px;
+  }
+
+  .scale-note {
+    font-size: 0.68rem;
+    color: #475569;
+    margin-top: 4px;
+  }
+
+  /* Gauge bar */
+  .gauge-bar {
+    margin-top: 10px;
+    background: #0f1117;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Interpretation cards */
+  .interp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .interp-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .interp-card h4 {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 6px;
+  }
+
+  .interp-card p {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.5;
+  }
+
+  /* Per-file table */
+  .table-wrap {
+    overflow-x: auto;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  th {
+    text-align: left;
+    padding: 12px 16px;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #334155;
+  }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #0f1117; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  /* Warnings */
+  .warning-box {
+    background: #1c1a0a;
+    border: 1px solid #854d0e;
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: #fde68a;
+    font-size: 0.82rem;
+    margin-bottom: 20px;
+  }
+
+  /* Caveat */
+  .caveat {
+    background: #0f1117;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 18px;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">⚙ CogniCode</div>
+  <a class="back-btn" href="/">← Analyze Another</a>
+</div>
+
+<div class="source-label">
+  Analyzed: <span>{{ result.source }}</span>
+  &nbsp;·&nbsp; {{ result.file_count }} Python file{% if result.file_count != 1 %}s{% endif %}
+  &nbsp;·&nbsp; Tools: <span>{{ result.tools_used | join(', ') }}</span>
+</div>
+
+{% if result.warnings %}
+<div class="warning-box">
+  <strong>Warnings:</strong><br>
+  {% for w in result.warnings %}<div>· {{ w }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<!-- Summary scores -->
+<div class="summary-grid">
+
+  <div class="metric-card complexity">
+    <div class="metric-title">Complexity</div>
+    <div class="metric-score" style="color: {{ result.complexity_color }};">
+      {{ result.complexity }}
+    </div>
+    <div class="metric-label" style="color: {{ result.complexity_color }};">
+      {{ result.complexity_label }}
+    </div>
+    <div class="scale-note">Scale 1–4 · Random Forest · κ = 0.52</div>
+    <div class="gauge-bar">
+      <div class="gauge-fill"
+           style="width: {{ (result.complexity / 4 * 100)|int }}%;
+                  background: {{ result.complexity_color }};"></div>
+    </div>
+  </div>
+
+  <div class="metric-card readability">
+    <div class="metric-title">Readability</div>
+    <div class="metric-score" style="color: {{ result.readability_color }};">
+      {{ result.readability }}
+    </div>
+    <div class="metric-label" style="color: {{ result.readability_color }};">
+      {{ result.readability_label }}
+    </div>
+    <div class="scale-note">Scale 1–4 · SVM RBF · κ = 0.32</div>
+    <div class="gauge-bar">
+      <div class="gauge-fill"
+           style="width: {{ (result.readability / 4 * 100)|int }}%;
+                  background: {{ result.readability_color }};"></div>
+    </div>
+  </div>
+
+  <div class="metric-card maintain">
+    <div class="metric-title">Maintainability</div>
+    <div class="metric-score" style="color: {{ result.maintainability_color }};">
+      {{ result.maintainability }}
+    </div>
+    <div class="metric-label" style="color: {{ result.maintainability_color }};">
+      {{ result.maintainability_label }}
+    </div>
+    <div class="scale-note">Scale 1–4 · SVM RBF · κ = 0.36</div>
+    <div class="gauge-bar">
+      <div class="gauge-fill"
+           style="width: {{ (result.maintainability / 4 * 100)|int }}%;
+                  background: {{ result.maintainability_color }};"></div>
+    </div>
+  </div>
+
+  <div class="metric-card refactor">
+    <div class="metric-title">Refactoring Need</div>
+    <div class="metric-score" style="color: {{ result.refactoring_color }};">
+      {{ (result.refactoring_prob * 100)|int }}%
+    </div>
+    <div class="metric-label" style="color: {{ result.refactoring_color }};">
+      {{ result.refactoring_label }}
+    </div>
+    <div class="scale-note">Probability · Random Forest · AUC = 0.76</div>
+    <div class="gauge-bar">
+      <div class="gauge-fill"
+           style="width: {{ (result.refactoring_prob * 100)|int }}%;
+                  background: {{ result.refactoring_color }};"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Interpretation -->
+<div class="section">
+  <div class="section-title">How to Interpret These Scores</div>
+  <div class="interp-grid">
+    <div class="interp-card">
+      <h4>Complexity (trustworthy)</h4>
+      <p>The model achieves κ = 0.52 against expert consensus. A score above 3 means the code is structurally simple. Scores below 2.5 suggest high structural complexity that may hinder understanding.</p>
+    </div>
+    <div class="interp-card">
+      <h4>Refactoring (useful screening)</h4>
+      <p>When probability exceeds 60%, the model flags code correctly about two-thirds of the time. Use this to prioritise which files to review manually, not to make final decisions.</p>
+    </div>
+    <div class="interp-card">
+      <h4>Readability (guide only)</h4>
+      <p>The model reaches 34% of expert consensus (κ = 0.24). It detects documentation quality well but cannot judge naming clarity or idiomatic style. Treat as a rough indicator.</p>
+    </div>
+    <div class="interp-card">
+      <h4>Maintainability (guide only)</h4>
+      <p>The model reaches 42% of expert consensus (κ = 0.32). It misses architectural signals that human reviewers rely on. Use alongside manual review, not as a substitute.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Per-file breakdown -->
+{% if result.per_file and result.file_count > 1 %}
+<div class="section">
+  <div class="section-title">
+    Per-File Breakdown
+    {% if result.file_count > 50 %} (showing top 50 of {{ result.file_count }}){% endif %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Complexity</th>
+          <th>Readability</th>
+          <th>Maintainability</th>
+          <th>Refactoring</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in result.per_file %}
+        <tr>
+          <td style="font-family: monospace; font-size: 0.78rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ row.file }}
+          </td>
+          <td>{{ row.complexity }}</td>
+          <td>{{ row.readability }}</td>
+          <td>{{ row.maintainability }}</td>
+          <td>
+            {% if row.refact_prob >= 0.6 %}
+            <span class="pill" style="background:#450a0a; color:#fca5a5;">{{ (row.refact_prob*100)|int }}%</span>
+            {% elif row.refact_prob >= 0.4 %}
+            <span class="pill" style="background:#431407; color:#fed7aa;">{{ (row.refact_prob*100)|int }}%</span>
+            {% else %}
+            <span class="pill" style="background:#052e16; color:#86efac;">{{ (row.refact_prob*100)|int }}%</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="caveat">
+  <strong>Caveat:</strong> CogniCode scores approximate human expert judgment using static analysis metrics and machine learning trained on 401 annotated Python files from open-source AI projects. Complexity predictions are most reliable (κ = 0.52 against expert consensus). Readability and Maintainability scores are partial approximations limited by what static metrics can measure. SonarQube and Understand metrics are not available in this lightweight build; their absence may slightly reduce accuracy. Always combine these scores with human code review for important decisions.
+</div>
+
+</body>
+</html>

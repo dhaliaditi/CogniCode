@@ -1,0 +1,198 @@
+"""
+predictor.py — CogniCode prediction engine.
+
+Best model per dimension (from paper Table 19):
+  Complexity     → Random Forest  (κ = 0.522)
+  Readability    → SVM RBF        (κ = 0.316)
+  Maintainability→ SVM RBF        (κ = 0.357)
+  Refactoring    → Random Forest  (κ = 0.383, AUC = 0.763)
+
+SonarQube and Understand require external infrastructure and are skipped
+in this lightweight build. Their feature columns are filled with zero.
+"""
+
+from __future__ import annotations
+
+import sys
+import tempfile
+import shutil
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+
+BASE_DIR  = Path(__file__).parent
+MODEL_DIR = BASE_DIR / "models"
+
+# Load once at import
+RF_COMPLEXITY      = joblib.load(MODEL_DIR / "rf_complexity.pkl")
+SVM_READABILITY    = joblib.load(MODEL_DIR / "svm_readability.pkl")
+SVM_MAINTAINABILITY= joblib.load(MODEL_DIR / "svm_maintainability.pkl")
+RF_REFACTORING     = joblib.load(MODEL_DIR / "rf_refactoring.pkl")
+FEATURE_COLS       = joblib.load(MODEL_DIR / "feature_cols.pkl")
+
+sys.path.insert(0, str(BASE_DIR))
+from collectors import RadonASTCollector, PylintCollector, ProspectorCollector
+
+_COMPLEXITY_RANK_MAP = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5}
+
+def _rel(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+def _find_python_files(root: Path) -> list[Path]:
+    skip = {".git","__pycache__",".tox",".venv","venv","env",
+            "node_modules","dist","build",".eggs",".mypy_cache"}
+    return sorted(p for p in root.rglob("*.py")
+                  if not any(part in skip for part in p.parts))
+
+def _encode_classname(val) -> float:
+    if pd.isna(val) or val == "":
+        return 0.0
+    return float(len(str(val).split("|")))
+
+def _rows_to_dataframe(rows: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(rows)
+
+    if "ClassName" in df.columns:
+        df["ClassName"] = df["ClassName"].apply(_encode_classname)
+
+    if "ComplexityRank" in df.columns:
+        df["ComplexityRank"] = df["ComplexityRank"].apply(
+            lambda x: _COMPLEXITY_RANK_MAP.get(str(x).upper(), 0)
+            if isinstance(x, str) else x
+        )
+
+    for col in FEATURE_COLS:
+        if col not in df.columns:
+            df[col] = 0.0
+
+    df = df[FEATURE_COLS].fillna(0).replace([np.inf, -np.inf], 0)
+    df = df.apply(pd.to_numeric, errors="coerce").fillna(0)
+    return df
+
+_SCORE_LABELS = {
+    (0.0, 1.5): ("Very Low",  "red"),
+    (1.5, 2.5): ("Low",       "orange"),
+    (2.5, 3.2): ("Moderate",  "gold"),
+    (3.2, 3.7): ("Good",      "steelblue"),
+    (3.7, 4.1): ("High",      "green"),
+}
+
+def _label(score: float) -> tuple[str, str]:
+    for (lo, hi), (name, color) in _SCORE_LABELS.items():
+        if lo <= score < hi:
+            return name, color
+    return "High", "green"
+
+def _refact_label(prob: float) -> tuple[str, str]:
+    if prob >= 0.6:
+        return "Likely Needs Refactoring", "red"
+    if prob >= 0.4:
+        return "Possibly Needs Refactoring", "orange"
+    return "Likely OK", "green"
+
+def predict_directory(root: Path, single_file: Path | None = None) -> dict:
+    py_files = [single_file] if single_file else _find_python_files(root)
+    if not py_files:
+        return {"error": "No Python files found."}
+
+    warnings: list[str] = []
+    radon_col      = RadonASTCollector()
+    pylint_col     = PylintCollector()
+    prospector_col = ProspectorCollector()
+
+    radon_rows: dict = {}
+    for f in py_files:
+        radon_rows[_rel(f, root)] = radon_col.collect(f)
+
+    try:
+        pylint_rows = pylint_col.collect_batch(py_files, root)
+    except Exception as e:
+        warnings.append(f"Pylint failed: {e}")
+        pylint_rows = {}
+
+    try:
+        prospector_rows = prospector_col.collect_batch(root)
+    except Exception as e:
+        warnings.append(f"Prospector failed: {e}")
+        prospector_rows = {}
+
+    raw_rows = []
+    for f in py_files:
+        key = _rel(f, root)
+        row: dict = {}
+        row.update(radon_rows.get(key, {}))
+        row.update(pylint_rows.get(key, {}))
+        row.update(prospector_rows.get(key, {}))
+        raw_rows.append(row)
+
+    file_names = [_rel(f, root) for f in py_files]
+    X = _rows_to_dataframe(raw_rows)
+
+    pred_complexity       = RF_COMPLEXITY.predict(X)
+    pred_readability      = SVM_READABILITY.predict(X)
+    pred_maintainability  = SVM_MAINTAINABILITY.predict(X)
+    pred_refact_prob      = RF_REFACTORING.predict_proba(X)[:, 1]
+
+    avg_c  = float(np.mean(pred_complexity))
+    avg_r  = float(np.mean(pred_readability))
+    avg_m  = float(np.mean(pred_maintainability))
+    avg_rf = float(np.mean(pred_refact_prob))
+
+    per_file = []
+    for i, fname in enumerate(file_names):
+        per_file.append({
+            "file":             fname,
+            "complexity":       round(float(pred_complexity[i]), 2),
+            "readability":      round(float(pred_readability[i]), 2),
+            "maintainability":  round(float(pred_maintainability[i]), 2),
+            "refact_prob":      round(float(pred_refact_prob[i]), 2),
+        })
+
+    c_label,  c_color  = _label(avg_c)
+    r_label,  r_color  = _label(avg_r)
+    m_label,  m_color  = _label(avg_m)
+    rf_label, rf_color = _refact_label(avg_rf)
+
+    return {
+        "file_count":           len(py_files),
+        "complexity":           round(avg_c, 2),
+        "readability":          round(avg_r, 2),
+        "maintainability":      round(avg_m, 2),
+        "refactoring_prob":     round(avg_rf, 2),
+        "complexity_label":     c_label,
+        "complexity_color":     c_color,
+        "readability_label":    r_label,
+        "readability_color":    r_color,
+        "maintainability_label":m_label,
+        "maintainability_color":m_color,
+        "refactoring_label":    rf_label,
+        "refactoring_color":    rf_color,
+        "per_file":             per_file[:50],
+        "warnings":             warnings,
+    }
+
+def predict_file(file_path: Path) -> dict:
+    return predict_directory(file_path.parent, single_file=file_path)
+
+def predict_from_github(repo_url: str) -> dict:
+    import subprocess
+    tmp = tempfile.mkdtemp(prefix="cognicode_")
+    try:
+        r = subprocess.run(
+            ["git", "clone", "--depth", "1", repo_url, tmp],
+            capture_output=True, text=True, timeout=120
+        )
+        if r.returncode != 0:
+            return {"error": f"Git clone failed: {r.stderr.strip()}"}
+        return predict_directory(Path(tmp))
+    except subprocess.TimeoutExpired:
+        return {"error": "Git clone timed out (120 s). Try a smaller repo."}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
