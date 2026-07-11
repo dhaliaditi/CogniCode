@@ -2,7 +2,7 @@
 
 **Predicting human-perceived Python code quality using static analysis and machine learning.**
 
-CogniCode predicts how human expert developers would rate Python code across four dimensions: Complexity, Readability, Maintainability, and Refactoring Necessity. It extracts 51 static analysis metrics from your code and feeds them into trained machine learning models that approximate human expert judgment.
+CogniCode predicts how human expert developers would rate Python code across four dimensions: Complexity, Readability, Maintainability, and Refactoring Necessity. It extracts 63 static analysis metrics from your code and feeds them into trained machine learning models that approximate human expert judgment.
 
 Built on research at the University of Saskatchewan. Trained on ratings from 35 professional Python developers across 401 files from 11 open-source AI projects (TensorFlow, PyTorch, scikit-learn, and others).
 
